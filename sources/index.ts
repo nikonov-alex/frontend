@@ -49,7 +49,6 @@ function main<State>( args: Args<State> ) {
 
     function redraw() {
         const rendered = args.render( state );
-        console.log( rendered.cloneNode( true ) );
         if ( root.isEqualNode( rendered ) ) {
             return;
         }
