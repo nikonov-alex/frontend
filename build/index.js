@@ -1,0 +1,1 @@
+var e="undefined"==typeof document?void 0:document;!!e&&e.createElement("template"),!!e&&e.createRange&&e.createRange();

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "outDir": "./build/",
+    "skipLibCheck": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "target": "esnext",
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "importHelpers": true,
+    "downlevelIteration": true,
+    "lib": [
+      "esnext",
+      "dom"
+    ],
+    "baseUrl": "${configDir}/"
+  },
+  "files": [
+    "${configDir}/sources/index.ts",
+    "${configDir}/sources/jsx-runtime.ts"
+  ]
+}
