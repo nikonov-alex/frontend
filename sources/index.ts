@@ -24,7 +24,8 @@ type Args<State> = {
     initialState: State,
     render: Render<State>,
     events?: Events<State>,
-    emit?: EmitRecord<State>[]
+    emit?: EmitRecord<State>[],
+    redraw?: "refresh" | "merge"
 };
 
 function main<State>( args: Args<State> ) {
@@ -52,7 +53,7 @@ function main<State>( args: Args<State> ) {
         if ( root.isEqualNode( rendered ) ) {
             return;
         }
-        if ( root.nodeName !== rendered.nodeName ) {
+        if ( args.redraw && "refresh" === args.redraw || root.nodeName !== rendered.nodeName ) {
             root.replaceWith( rendered );
             root = rendered;
         }
