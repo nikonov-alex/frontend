@@ -21,7 +21,6 @@
     "baseUrl": "${configDir}/"
   },
   "files": [
-    "${configDir}/sources/index.ts",
-    "${configDir}/sources/jsx-runtime.ts"
+    "${configDir}/sources/index.ts"
   ]
 }

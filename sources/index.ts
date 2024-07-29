@@ -12,16 +12,40 @@ const isGlobalEvent = <State>( record: EventRecord<State> ): record is GlobalEve
 const getHandler = <State>( record: EventRecord<State> ): EventHandler<State> =>
     isGlobalEvent( record ) ? record.handler : record;
 
+type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
+type EventEmitter<State> = { ( s: State ): Event };
+type EmitRecord<State> = {
+    when: EmitPredicate<State>,
+    emit: EventEmitter<State>,
+    channel: "bubble" | "global"
+}
+
 type Args<State> = {
     initialState: State,
     render: Render<State>,
-    events?: Events<State>
+    events?: Events<State>,
+    emit?: EmitRecord<State>[]
 };
 
 function main<State>( args: Args<State> ) {
     let state = args.initialState;
+    const wrapper = document.createElement( "div" );
     let root = args.render( state );
+    wrapper.appendChild( root );
     let deferredRedraw = false;
+
+    function maybeEmitEvents( oldState: State ) {
+        if ( args.emit ) {
+            for ( const record of args.emit ) {
+                if ( record.when( oldState, state ) ) {
+                    const target = "bubble" === record.channel
+                        ? wrapper
+                        : window;
+                    target.dispatchEvent( record.emit( state ) );
+                }
+            }
+        }
+    }
 
     function redraw() {
         const rendered = args.render( state );
@@ -35,21 +59,8 @@ function main<State>( args: Args<State> ) {
         }
         else {
             morphdom( root, rendered, {
-                getNodeKey: node =>
-                    "cacheID" in node
-                        ? node.cacheID
-                    : "id" in node
-                        ? node.id
-                    : undefined,
-                onBeforeNodeAdded: ( node ) =>
-                    "cacheID" in node && "reference" in node
-                        //@ts-ignore
-                        ? node.reference.deref().cloneNode( true )
-                    : node,
-                onBeforeElUpdated: ( fromEl, toEl ) => !(
-                    "cacheID" in toEl && "cacheID" in fromEl && toEl.cacheID === fromEl.cacheID ||
-                    fromEl.isEqualNode( toEl )
-                )
+                onBeforeElUpdated: ( fromEl, toEl ) =>
+                    !fromEl.isEqualNode( toEl )
             } );
         }
     }
@@ -67,6 +78,7 @@ function main<State>( args: Args<State> ) {
             }, 0 );
             deferredRedraw = true;
         }
+        maybeEmitEvents( oldState );
     }
 
     if ( args.events ) {
@@ -85,12 +97,12 @@ function main<State>( args: Args<State> ) {
         }
 
         Object.entries( args.events ).forEach( ([name, record]) => {
-            const target = isGlobalEvent( record ) ? window : root;
+            const target = isGlobalEvent( record ) ? window : wrapper;
             target.addEventListener( name, eventHandler, true )
         } );
     }
 
-    return root;
+    return wrapper;
 }
 
 export default main;

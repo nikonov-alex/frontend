@@ -1,10 +1,7 @@
 const path = require('path');
 
 module.exports = {
-    entry: {
-        index: './sources/index.ts',
-        "jsx-runtime": './sources/jsx-runtime.ts'
-    },
+    entry: './sources/index.ts',
     mode: 'production',
     devtool: false,
     module: {
@@ -20,7 +17,7 @@ module.exports = {
         extensions: ['.js', '.jsx', '.tsx', '.ts']
     },
     output: {
-        filename: '[name].js',
+        filename: 'index.js',
         path: path.resolve( "./build" ),
         library: {
             type: "module"
