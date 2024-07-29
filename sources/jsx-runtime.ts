@@ -1,6 +1,3 @@
-import * as React from 'react';
-
-
 const RESERVED_PROPS = [ "key", "ref", "__self", "__source" ];
 
 
@@ -62,11 +59,11 @@ const objectID = ( obj: object | symbol ): number => {
 const valueHash = ( value: any ): string =>
     value === null
         ? "null" :
-    value === undefined
-        ? "undef" :
-    [ "boolean", "number", "bigint", "string" ].includes( typeof value )
-        ? value.toString()
-    : objectID( value );
+        value === undefined
+            ? "undef" :
+            [ "boolean", "number", "bigint", "string" ].includes( typeof value )
+                ? value.toString()
+                : objectID( value );
 
 const hash = ( props: object ): PROPS_HASH =>
     Object.entries( props ).reduce(
@@ -163,18 +160,28 @@ const HTMLNode = <P = any, Tag extends keyof JSX.IntrinsicElements = keyof JSX.I
 export const jsx = (
     type: ElementType,
     props: Props,
-    key?: React.Key
+    key?: string | number | bigint
 ): JSX.Element =>
     "string" === typeof type
         ? HTMLNode( type, props )
-    : functionComponent( type, props )
+        : functionComponent( type, props )
 
 
 
+export type Node =
+    | object
+    | (() => Node)
+    | boolean
+    | number
+    | bigint
+    | string
+    | null
+    | undefined;
 
+type Attributes = Props<Record<string, Node | undefined>>
 
 export namespace JSX {
-    export type IntrinsicElements = React.JSX.IntrinsicElements;
+    export type IntrinsicElements = Record<string, Attributes>;
     export type Element = HTMLElement;
 }
 
