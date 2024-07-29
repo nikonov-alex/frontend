@@ -22,6 +22,9 @@ module.exports = {
     output: {
         filename: '[name].js',
         path: path.resolve( "./build" ),
+        library: {
+            type: "module"
+        }
     },
     experiments: {
         outputModule: true,
