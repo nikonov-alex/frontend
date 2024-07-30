@@ -17,7 +17,7 @@ type EventEmitter<State> = { ( s: State ): Event };
 type EmitRecord<State> = {
     when: EmitPredicate<State>,
     emit: EventEmitter<State>,
-    target: "element" | "window"
+    target?: "element" | "window"
 }
 
 type Args<State> = {
@@ -25,12 +25,16 @@ type Args<State> = {
     render: Render<State>,
     events?: Events<State>,
     emit?: EmitRecord<State>[],
+    id?: string,
     redraw?: "refresh" | "merge"
 };
 
 function main<State>( args: Args<State> ) {
     let state = args.initialState;
     const wrapper = document.createElement( "div" );
+    if ( args.id ) {
+        wrapper.id = args.id;
+    }
     let root = args.render( state );
     wrapper.appendChild( root );
     let deferredRedraw = false;
@@ -39,9 +43,9 @@ function main<State>( args: Args<State> ) {
         if ( args.emit ) {
             for ( const record of args.emit ) {
                 if ( record.when( oldState, state ) ) {
-                    const target = "element" === record.target
-                        ? wrapper
-                        : window;
+                    const target = "window" === record.target
+                        ? window
+                        : wrapper;
                     target.dispatchEvent( record.emit( state ) );
                 }
             }
