@@ -26,6 +26,7 @@ type Args<State> = {
     events?: Events<State>,
     emit?: EmitRecord<State>[],
     id?: string,
+    className?: string,
     redraw?: "refresh" | "merge"
 };
 
@@ -34,6 +35,9 @@ function main<State>( args: Args<State> ) {
     const wrapper = document.createElement( "div" );
     if ( args.id ) {
         wrapper.id = args.id;
+    }
+    if ( args.className ) {
+        wrapper.className = args.className;
     }
     let root = args.render( state );
     wrapper.appendChild( root );
