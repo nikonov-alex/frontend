@@ -3,7 +3,7 @@ import morphdom from "morphdom";
 type Render<State> = { ( s: State ): HTMLElement };
 type EventHandler<State> = { ( s: State, e: Event ): State };
 type LocalEventRecord<State> = EventHandler<State>;
-type GlobalEventRecord<State> = { handler: EventHandler<State>, source: "global" };
+type GlobalEventRecord<State> = { handler: EventHandler<State>, target: "window" | "document" };
 type EventRecord<State> = LocalEventRecord<State> | GlobalEventRecord<State>;
 type Events<State> = { [name: string]: EventRecord<State> };
 
@@ -17,7 +17,7 @@ type EventEmitter<State> = { ( s: State ): Event };
 type EmitRecord<State> = {
     when: EmitPredicate<State>,
     emit: EventEmitter<State>,
-    channel: "bubble" | "global"
+    target: "element" | "window"
 }
 
 type Args<State> = {
@@ -39,7 +39,7 @@ function main<State>( args: Args<State> ) {
         if ( args.emit ) {
             for ( const record of args.emit ) {
                 if ( record.when( oldState, state ) ) {
-                    const target = "bubble" === record.channel
+                    const target = "element" === record.target
                         ? wrapper
                         : window;
                     target.dispatchEvent( record.emit( state ) );
@@ -97,7 +97,11 @@ function main<State>( args: Args<State> ) {
         }
 
         Object.entries( args.events ).forEach( ([name, record]) => {
-            const target = isGlobalEvent( record ) ? window : wrapper;
+            const target = isGlobalEvent( record )
+                ? "window" === record.target
+                    ? window
+                    : document
+                : wrapper;
             target.addEventListener( name, eventHandler, true )
         } );
     }
