@@ -94,7 +94,7 @@ const component = <State>(
                         !fromEl.isEqualNode( toEl ),
                     onBeforeNodeDiscarded: node => {
                         console.log( "discarded", node.cloneNode( true ) );
-                        return true;
+                        return !node.parentElement?.classList.contains( "viewport" );
                     }
                 } );
             }
