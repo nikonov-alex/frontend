@@ -54,6 +54,14 @@ const updateViewports = (
         }
     } );
 
+const initViewports = ( viewports: {[id: string]: HTMLElement} ) => {
+    Object.entries( viewports ).forEach( ( [ id, viewport ] ) => {
+        if ( id in COMPONENTS ) {
+            component( COMPONENTS[id], { viewport } );
+        }
+    } );
+}
+
 const destroyInstances = ( oldViewports: {[id: string]: HTMLElement} ) =>
     Object.keys( oldViewports ).forEach( id => {
         INSTANCES[id].destroy();
@@ -67,6 +75,7 @@ const component = <State>(
 ) => {
     let state = component.initialState;
     let element = component.render( state );
+    initViewports( findViewports( element ) );
     let deferredRedraw = false;
 
     const redraw = () => {
