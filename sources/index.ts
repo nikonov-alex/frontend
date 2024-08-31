@@ -71,6 +71,7 @@ const component = <State>(
 
     const redraw = () => {
         const rendered = component.render( state );
+        console.log( "rendered", rendered.cloneNode( true ) );
         if ( !element.isEqualNode( rendered ) ) {
             const oldViewports = findViewports( element );
 
@@ -83,7 +84,7 @@ const component = <State>(
                     onBeforeElUpdated: ( fromEl, toEl ) =>
                         !fromEl.isEqualNode( toEl ),
                     onBeforeNodeDiscarded: node => {
-                        console.log( node.cloneNode( true ) );
+                        console.log( "discarded", node.cloneNode( true ) );
                         return true;
                     }
                 } );
