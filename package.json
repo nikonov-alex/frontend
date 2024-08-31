@@ -1,6 +1,6 @@
 {
   "name": "@nikonov-alex/frontend",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "description": "Frontend library inspired by HTDP book",
   "main": "build/index.js",
   "types": "sources/index.ts",
@@ -25,6 +25,7 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "@nikonov-alex/functional-library": "^0.0.31",
     "morphdom": "^2.7.4"
   }
 }

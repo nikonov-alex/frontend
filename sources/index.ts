@@ -1,120 +1,147 @@
 import morphdom from "morphdom";
 
-type Render<State> = { ( s: State ): HTMLElement };
 type EventHandler<State> = { ( s: State, e: Event ): State };
-type LocalEventRecord<State> = EventHandler<State>;
-type GlobalEventRecord<State> = { handler: EventHandler<State>, target: "window" | "document" };
-type EventRecord<State> = LocalEventRecord<State> | GlobalEventRecord<State>;
-type Events<State> = { [name: string]: EventRecord<State> };
+type Events<State> = { [name: string]: EventHandler<State> };
 
-const isGlobalEvent = <State>( record: EventRecord<State> ): record is GlobalEventRecord<State> =>
-    typeof record !== "function";
-const getHandler = <State>( record: EventRecord<State> ): EventHandler<State> =>
-    isGlobalEvent( record ) ? record.handler : record;
-
-type EmitPredicate<State> = { ( os: State, ns: State ): boolean };
-type EventEmitter<State> = { ( s: State ): Event };
-type EmitRecord<State> = {
-    when: EmitPredicate<State>,
-    emit: EventEmitter<State>,
-    target?: "element" | "window"
+type Component<State> = {
+    initialState: State,
+    render: { ( s: State ): HTMLElement },
+    events?: {
+        local?: Events<State>,
+        window?: Events<State>
+    },
 }
 
-type Args<State> = {
-    initialState: State,
-    render: Render<State>,
-    events?: Events<State>,
-    emit?: EmitRecord<State>[],
-    id?: string,
-    className?: string,
-    redraw?: "refresh" | "merge"
-};
+type Options = {
+    viewport: HTMLElement
+}
 
-function main<State>( args: Args<State> ) {
-    let state = args.initialState;
-    const wrapper = document.createElement( "div" );
-    if ( args.id ) {
-        wrapper.id = args.id;
-    }
-    if ( args.className ) {
-        wrapper.className = args.className;
-    }
-    let root = args.render( state );
-    wrapper.appendChild( root );
-    let deferredRedraw = false;
+let COMPONENTS: {[id: string]: Component<any>} = { };
 
-    function maybeEmitEvents( oldState: State ) {
-        if ( args.emit ) {
-            for ( const record of args.emit ) {
-                if ( record.when( oldState, state ) ) {
-                    const target = "window" === record.target
-                        ? window
-                        : wrapper;
-                    target.dispatchEvent( record.emit( state ) );
-                }
-            }
-        }
-    }
+const registerComponents = ( components: {[id: string]: Component<any>} ) => {
+    COMPONENTS = components;
+}
 
-    function redraw() {
-        const rendered = args.render( state );
-        if ( root.isEqualNode( rendered ) ) {
-            return;
-        }
-        if ( args.redraw && "refresh" === args.redraw || root.nodeName !== rendered.nodeName ) {
-            root.replaceWith( rendered );
-            root = rendered;
+const INSTANCES: {[id: string]: {
+    draw: {(): HTMLElement},
+    destroy: {(): void}
+}} = { };
+
+const findViewports = ( elem: HTMLElement ) =>
+    Array.from( elem.querySelectorAll<HTMLElement>( ".viewport" ) )
+        .reduce( ( map, viewport ) =>
+            ( { ... map, [viewport.id]: viewport } ),
+            { } as {[id: string]: HTMLElement} );
+
+const updateViewports = (
+    oldViewports: {[id: string]: HTMLElement},
+    newViewports: {[id: string]: HTMLElement}
+) =>
+    Object.entries( newViewports ).forEach( ( [ id, viewport ] ) => {
+        if ( viewport.hasChildNodes() ) {
+            delete oldViewports[id];
         }
         else {
-            morphdom( root, rendered, {
-                onBeforeElUpdated: ( fromEl, toEl ) =>
-                    !fromEl.isEqualNode( toEl )
-            } );
-        }
-    }
-
-    function changeState( newState: State ) {
-        if ( state === newState ) {
-            return;
-        }
-        const oldState = state;
-        state = newState;
-        if ( !deferredRedraw ) {
-            setTimeout( () => {
-                redraw();
-                deferredRedraw = false;
-            }, 0 );
-            deferredRedraw = true;
-        }
-        maybeEmitEvents( oldState );
-    }
-
-    if ( args.events ) {
-        function eventHandler( event: Event ) {
-            //@ts-ignore
-            const record = args.events[event.type];
-            if ( !isGlobalEvent( record ) ) {
-                if ( [ "submit" ].includes( event.type ) ) {
-                    event.preventDefault();
+            if ( id in INSTANCES ) {
+                viewport.append( INSTANCES[id].draw() );
+                if ( id in oldViewports ) {
+                    delete oldViewports[id];
                 }
-                event.stopImmediatePropagation();
+            }
+            else if ( id in COMPONENTS ) {
+                component( COMPONENTS[id], { viewport } );
+            }
+        }
+    } );
+
+const destroyInstances = ( oldViewports: {[id: string]: HTMLElement} ) =>
+    Object.keys( oldViewports ).forEach( id => {
+        INSTANCES[id].destroy();
+        delete INSTANCES[id];
+        delete oldViewports[id];
+    } );
+
+const component = <State>(
+    component: Component<State>,
+    options: Options
+) => {
+    let state = component.initialState;
+    let element = component.render( state );
+    let deferredRedraw = false;
+
+    const redraw = () => {
+        const rendered = component.render( state );
+        if ( !element.isEqualNode( rendered ) ) {
+            const oldViewports = findViewports( element );
+
+            if ( element.nodeName !== rendered.nodeName ) {
+                element.replaceWith( rendered );
+                element = rendered;
+            }
+            else {
+                morphdom( element, rendered, {
+                    onBeforeElUpdated: ( fromEl, toEl ) =>
+                        !fromEl.isEqualNode( toEl ),
+                    onBeforeNodeDiscarded: node => {
+                        console.log( node.cloneNode( true ) );
+                        return true;
+                    }
+                } );
             }
 
-            const handler = getHandler( record );
-            changeState( handler( state, event ) );
+            const newViewports = findViewports( element );
+            updateViewports( oldViewports, newViewports );
+            destroyInstances( oldViewports );
         }
+    };
 
-        Object.entries( args.events ).forEach( ([name, record]) => {
-            const target = isGlobalEvent( record )
-                ? "window" === record.target
-                    ? window
-                    : document
-                : wrapper;
-            target.addEventListener( name, eventHandler, true )
-        } );
+    const changeState = ( newState: State ) => {
+        if ( state !== newState ) {
+            state = newState;
+            if ( !deferredRedraw ) {
+                setTimeout( () => {
+                    redraw();
+                    deferredRedraw = false;
+                }, 0 );
+                deferredRedraw = true;
+            }
+        }
+    };
+
+    const localEventsHandler = ( event: Event ) => {
+        if ( [ "submit" ].includes( event.type ) ) {
+            event.preventDefault();
+        }
+        event.stopImmediatePropagation();
+        //@ts-ignore
+        const eventHandler = component.events.local[event.type];
+        changeState( eventHandler( state, event ) );
+    };
+    const windowEventsHandler = ( event: Event ) => {
+        //@ts-ignore
+        const eventHandler = component.events.window[event.type];
+        changeState( eventHandler( state, event ) );
+    };
+
+    const bindEvents = ( events: Events<State>, target: EventTarget, eventsHandler: { (e: Event): void } ) =>
+        Object.keys( events ).forEach( ( eventName ) =>
+            target.addEventListener( eventName, eventsHandler ));
+
+    const unbindEvents = ( events: Events<State>, target: EventTarget, eventsHandler: { (e: Event): void } ) =>
+        Object.keys( events ).forEach( ( eventName ) =>
+            target.removeEventListener( eventName, eventsHandler ));
+
+    const draw = () => element;
+    const destroy = () => {
+        unbindEvents( component.events?.local ?? { }, element, localEventsHandler );
+        unbindEvents( component.events?.window ?? { }, window, windowEventsHandler );
     }
 
-    return wrapper;
+    bindEvents( component.events?.local ?? { }, element, localEventsHandler );
+    bindEvents( component.events?.window ?? { }, window, windowEventsHandler );
+    options.viewport.append( element );
+    INSTANCES[options.viewport.id] = { draw, destroy };
 }
 
-export default main;
+
+export { registerComponents, component };
