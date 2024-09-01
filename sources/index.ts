@@ -1,26 +1,40 @@
 import morphdom from "morphdom";
 
-type EventHandler<State> = { ( s: State, e: Event ): State }
-type Events<State> = { [name: string]: EventHandler<State> };
+type EventHandler<State, SharedStates extends any[]> = { ( s: State, e: Event, ... sharedStates: SharedStates ): State }
+type Events<State, SharedStates extends any[]> = { [name: string]: EventHandler<State, SharedStates> };
 
-type Render<State> = { ( s: State ): HTMLElement };
+type Render<State, SharedStates extends any[]> = { ( s: State, ... sharedStates: SharedStates ): HTMLElement };
 
-type Component<State> = {
-    initialState: State,
-    render: Render<State>,
-    events?: {
-        local?: Events<State>,
-        window?: Events<State>
+class SharedState<T> {
+
+    constructor(
+        private _data: T
+    ) { }
+
+    public get data(): T {
+        return this._data;
     }
+
+}
+
+
+type Component<State, SharedStates extends any[]> = {
+    initialState: State,
+    render: Render<State, SharedStates>,
+    events?: {
+        local?: Events<State, SharedStates>,
+        window?: Events<State, SharedStates>
+    },
+    sharedStates: {[I in keyof SharedStates]: SharedState<SharedStates[I]>}
 }
 
 type Options = {
     viewport: HTMLElement
 }
 
-let COMPONENTS: {[id: string]: Component<any>} = { };
+let COMPONENTS: {[id: string]: Component<any, any[]>} = { };
 
-const registerComponents = ( components: {[id: string]: Component<any>} ) => {
+const registerComponents = ( components: {[id: string]: Component<any, any[]>} ) => {
     COMPONENTS = components;
 }
 
@@ -71,17 +85,24 @@ const destroyInstances = ( oldViewports: {[id: string]: HTMLElement} ) =>
         delete oldViewports[id];
     } );
 
-const component = <State>(
-    component: Component<State>,
+const sharedStatesValues =
+    <SharedStates extends any[]>( sharedStates: {[I in keyof SharedStates]: SharedState<SharedStates[I]>}): SharedStates =>
+        sharedStates.map( sharedState => sharedState.data ) as SharedStates;
+
+const component = <State, SharedStates extends any[]>(
+    component: Component<State, SharedStates>,
     options: Options
 ) => {
+    const render = ( state: State ) =>
+        component.render( state, ... sharedStatesValues( component.sharedStates ) );
+
     let state = component.initialState;
-    let element = component.render( state );
+    let element = render( state );
     initViewports( findViewports( element ) );
     let deferredRedraw = false;
 
     const redraw = () => {
-        const rendered = component.render( state );
+        const rendered = render( state );
         console.log( "rendered", rendered.cloneNode( true ) );
         if ( !element.isEqualNode( rendered ) ) {
             const oldViewports = findViewports( element );
@@ -120,9 +141,9 @@ const component = <State>(
         }
     };
 
-    const eventHandler = ( event: Event, eventHandler: EventHandler<State> ) => {
+    const eventHandler = ( event: Event, eventHandler: EventHandler<State, SharedStates> ) => {
         changeState(
-            eventHandler( state, event ) );
+            eventHandler( state, event, ... sharedStatesValues( component.sharedStates ) ) );
     }
 
     const localEventsHandler = ( event: Event ) => {
@@ -139,11 +160,11 @@ const component = <State>(
         eventHandler( event, component.events.window[event.type] );
     };
 
-    const bindEvents = ( events: Events<State>, target: EventTarget, eventsHandler: { (e: Event): void } ) =>
+    const bindEvents = ( events: Events<State, SharedStates>, target: EventTarget, eventsHandler: { (e: Event): void } ) =>
         Object.keys( events ).forEach( ( eventName ) =>
             target.addEventListener( eventName, eventsHandler ));
 
-    const unbindEvents = ( events: Events<State>, target: EventTarget, eventsHandler: { (e: Event): void } ) =>
+    const unbindEvents = ( events: Events<State, SharedStates>, target: EventTarget, eventsHandler: { (e: Event): void } ) =>
         Object.keys( events ).forEach( ( eventName ) =>
             target.removeEventListener( eventName, eventsHandler ));
 
@@ -160,4 +181,4 @@ const component = <State>(
 }
 
 
-export { registerComponents, component };
+export { registerComponents, component, SharedState };
