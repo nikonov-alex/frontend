@@ -1,15 +1,17 @@
 import morphdom from "morphdom";
 
-type EventHandler<State> = { ( s: State, e: Event ): State };
+type EventHandler<State> = { ( s: State, e: Event ): State }
 type Events<State> = { [name: string]: EventHandler<State> };
+
+type Render<State> = { ( s: State ): HTMLElement };
 
 type Component<State> = {
     initialState: State,
-    render: { ( s: State ): HTMLElement },
+    render: Render<State>,
     events?: {
         local?: Events<State>,
         window?: Events<State>
-    },
+    }
 }
 
 type Options = {
@@ -118,19 +120,23 @@ const component = <State>(
         }
     };
 
+    const eventHandler = ( event: Event, eventHandler: EventHandler<State> ) => {
+        changeState(
+            eventHandler( state, event ) );
+    }
+
     const localEventsHandler = ( event: Event ) => {
         if ( [ "submit" ].includes( event.type ) ) {
             event.preventDefault();
         }
         event.stopImmediatePropagation();
         //@ts-ignore
-        const eventHandler = component.events.local[event.type];
-        changeState( eventHandler( state, event ) );
+        eventHandler( event, component.events.local[event.type] );
+
     };
     const windowEventsHandler = ( event: Event ) => {
         //@ts-ignore
-        const eventHandler = component.events.window[event.type];
-        changeState( eventHandler( state, event ) );
+        eventHandler( event, component.events.window[event.type] );
     };
 
     const bindEvents = ( events: Events<State>, target: EventTarget, eventsHandler: { (e: Event): void } ) =>
