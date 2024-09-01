@@ -44,7 +44,8 @@ type Component<State, SharedStates extends any[]> = {
     render: Render<State, SharedStates>,
     events?: {
         local?: Events<State, SharedStates>,
-        window?: Events<State, SharedStates>
+        window?: Events<State, SharedStates>,
+        document?: Events<State, SharedStates>
     },
     sharedStates: {[I in keyof SharedStates]: SharedState<SharedStates[I]>},
     updateSharedStates?: UpdateSharedState<State, any>[]
@@ -192,6 +193,11 @@ const component = <State, SharedStates extends any[]>(
         eventHandler( event, component.events.window[event.type] );
     };
 
+    const documentEventsHandler = ( event: Event ) => {
+        //@ts-ignore
+        eventHandler( event, component.events.document[event.type] );
+    };
+
     const bindEvents = ( events: Events<State, SharedStates>, target: EventTarget, eventsHandler: { (e: Event): void } ) =>
         Object.keys( events ).forEach( ( eventName ) =>
             target.addEventListener( eventName, eventsHandler ));
@@ -208,12 +214,14 @@ const component = <State, SharedStates extends any[]>(
     const destroy = () => {
         unbindEvents( component.events?.local ?? { }, element, localEventsHandler );
         unbindEvents( component.events?.window ?? { }, window, windowEventsHandler );
+        unbindEvents( component.events?.document ?? { }, document, documentEventsHandler );
         component.sharedStates.forEach( sharedState =>
             sharedState.removeListener( sharedStateUpdated ) );
     }
 
     bindEvents( component.events?.local ?? { }, element, localEventsHandler );
     bindEvents( component.events?.window ?? { }, window, windowEventsHandler );
+    bindEvents( component.events?.document ?? { }, document, documentEventsHandler );
     component.sharedStates.forEach( sharedState =>
         sharedState.addListener( sharedStateUpdated ) );
     options.viewport.append( element );

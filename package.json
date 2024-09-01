@@ -1,6 +1,6 @@
 {
   "name": "@nikonov-alex/frontend",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "description": "Frontend library inspired by HTDP book",
   "main": "build/index.js",
   "types": "sources/index.ts",
