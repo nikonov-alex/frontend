@@ -7,6 +7,8 @@ type Render<State, SharedStates extends any[]> = { ( s: State, ... sharedStates:
 
 class SharedState<T> {
 
+    private _listeners: Set<{(): void}> = new Set();
+
     constructor(
         private _data: T
     ) { }
@@ -15,8 +17,27 @@ class SharedState<T> {
         return this._data;
     }
 
+    public set data( value: T ) {
+        this._data = value;
+        this._listeners.forEach( listener =>
+            listener() );
+    }
+
+    public addListener( listener: {(): void} ) {
+        this._listeners.add( listener );
+    }
+
+    public removeListener( listener: {(): void} ) {
+        this._listeners.delete( listener );
+    }
+
 }
 
+type UpdateSharedState<State, T> = {
+    sharedState: SharedState<T>,
+    when: { ( os: State, ns: State ): boolean },
+    update: { ( s: State ): T }
+}
 
 type Component<State, SharedStates extends any[]> = {
     initialState: State,
@@ -25,7 +46,8 @@ type Component<State, SharedStates extends any[]> = {
         local?: Events<State, SharedStates>,
         window?: Events<State, SharedStates>
     },
-    sharedStates: {[I in keyof SharedStates]: SharedState<SharedStates[I]>}
+    sharedStates: {[I in keyof SharedStates]: SharedState<SharedStates[I]>},
+    updateSharedStates?: UpdateSharedState<State, any>[]
 }
 
 type Options = {
@@ -128,16 +150,26 @@ const component = <State, SharedStates extends any[]>(
         }
     };
 
+    const maybeRedraw = () => {
+        if ( !deferredRedraw ) {
+            setTimeout( () => {
+                redraw();
+                deferredRedraw = false;
+            }, 0 );
+            deferredRedraw = true;
+        }
+    }
+
     const changeState = ( newState: State ) => {
         if ( state !== newState ) {
+            const oldState = state;
             state = newState;
-            if ( !deferredRedraw ) {
-                setTimeout( () => {
-                    redraw();
-                    deferredRedraw = false;
-                }, 0 );
-                deferredRedraw = true;
-            }
+            maybeRedraw();
+            component.updateSharedStates?.forEach( ( { sharedState, when, update } ) => {
+                if ( when( oldState, state ) ) {
+                    sharedState.data = update( state );
+                }
+            } );
         }
     };
 
@@ -168,14 +200,22 @@ const component = <State, SharedStates extends any[]>(
         Object.keys( events ).forEach( ( eventName ) =>
             target.removeEventListener( eventName, eventsHandler ));
 
+    const sharedStateUpdated = () => {
+        maybeRedraw();
+    }
+
     const draw = () => element;
     const destroy = () => {
         unbindEvents( component.events?.local ?? { }, element, localEventsHandler );
         unbindEvents( component.events?.window ?? { }, window, windowEventsHandler );
+        component.sharedStates.forEach( sharedState =>
+            sharedState.removeListener( sharedStateUpdated ) );
     }
 
     bindEvents( component.events?.local ?? { }, element, localEventsHandler );
     bindEvents( component.events?.window ?? { }, window, windowEventsHandler );
+    component.sharedStates.forEach( sharedState =>
+        sharedState.addListener( sharedStateUpdated ) );
     options.viewport.append( element );
     INSTANCES[options.viewport.id] = { draw, destroy };
 }
